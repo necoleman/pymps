@@ -32,7 +32,7 @@ def assemble_triangle_points(angle, r, num_pts):
 	base = np.array([1,0])
 	tip = np.array([r*np.cos(angle*np.pi),r*np.sin(angle*np.pi)])
 	bdy_pt_list = [t*base + (1-t)*tip
-									for t in np.linspace(0,1,num=num_pts,endpoint=False)]
+	              for t in np.linspace(0,1,num=num_pts,endpoint=False)]
 	int_pt_list = []
 	for _ in range(num_pts):
 		x = np.random.random()
@@ -41,8 +41,8 @@ def assemble_triangle_points(angle, r, num_pts):
 			y = 1-y
 			x = 1-x
 		int_pt_list.append(
-											np.array(x+base[0]*y,base[1]*y)
-											)
+		                  np.array(x+base[0]*y,base[1]*y)
+		                  )
 	return bdy_pt_list, int_pt_list
 
 if __name__=='__main__':
