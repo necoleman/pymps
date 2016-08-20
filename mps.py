@@ -1,59 +1,74 @@
 import numpy as np
 from scipy.special import jv
 from scipy import linalg
+import sys
 
-def evaluate_basis_func(angle,k,eig,point):
-	r,th = point
-	return jv(angle*k,np.sqrt(eig)*r)*np.sin(angle*k*np.pi)
+def evaluate_basis_func(angle, eig, rvec, tvec, kvec, mode='Dirichlet'):
+	"""Take in index vector k, vector of rs, and vector of thetas.
+	Return matrix A."""
+	if mode == 'Dirichlet':
+		return jv(angle*kvec,np.sqrt(eig)*rvec)*np.sin(angle*kvec*tvec)
+	elif mode == 'Neumann':
+		return jvp(angle*kvec,np.sqrt(eig)*rvec,1)*np.cos(angle*kvec*tvec)
+	else:
+		print 'Sorry, that is not a valid mode. Please choose Dirichlet or Neumann.'
+		return None
 
-def assemble_sample_matrix(eig, num_freq, angle, bdy_pts, int_pts):
-	m = []
-	for p in bdy_pts:
-		row = []
-		for k in range(num_freq):
-			row.append(evaluate_basis_func(angle,k,eig,p))
-		m.append(row)
-	for q in int_pts:
-		row = []
-		for k in range(num_freq):
-			row.append(evaluate_basis_func(angle,k,eig,p))
-		m.append(row)
-	return np.array(m)
+def find_sing_val(A, num_bdy_pts):
+	"""Find minimal singular value of boundary part of the Q of A's QR."""
+	Q,R = linalg.qr(A, mode='economic')
+	print Q[:num_bdy_pts-1,:].shape
+	return np.min(linalg.svd(Q[:num_bdy_pts,:])[1])
 
-def compute_sing(eig, num_freq, angle, bdy_pts, int_pts):
-	sample_matrix = assemble_sample_matrix(eig, num_freq, angle,
-																					bdy_pts, int_pts)
-	orth = linalg.qr(sample_matrix)[0]
-	sing_value = sorted(sing_vals,reverse=True)[0]
-	sing_vec = sing_vecs[:,-1]
-	return sing_value, sing_vec
+def compute_square_eigenvalues():
+	"""Compute Laplace Dirichlet eigenvalues of the square"""
+	a = 2
+	N = 25
+	num_pts = 2*N
+	k = np.arange(1,N).reshape(N-1,1)
 
-def assemble_triangle_points(angle, r, num_pts):
-	base = np.array([1,0])
-	tip = np.array([r*np.cos(angle*np.pi),r*np.sin(angle*np.pi)])
-	bdy_pt_list = [t*base + (1-t)*tip
-	              for t in np.linspace(0,1,num=num_pts,endpoint=False)]
-	int_pt_list = []
-	for _ in range(num_pts):
-		x = np.random.random()
-		y = np.random.random()
-		if x + y > 1:
-			y = 1-y
-			x = 1-x
-		int_pt_list.append(
-		                  np.array(x+base[0]*y,base[1]*y)
-		                  )
-	return bdy_pt_list, int_pt_list
+	# expand about origin
+	x1 = np.ones(num_pts)
+	y1 = np.linspace(0,1,num_pts)
+	x2 = np.linspace(0,1,num_pts)
+	y2 = np.ones(num_pts)
 
-if __name__=='__main__':
-	bd,nt = assemble_triangle_points(0.5,1.0,10)
-	#print bd
-	#print nt
-	a = assemble_sample_matrix(1.,10,0.5,bd,nt)
-	#print a
-	s = compute_sing(1.,10,0.5,bd,nt)[0]
-	print s
+	xint = np.random.random(2*num_pts)
+	yint = np.random.random(2*num_pts)
 
-	for t in np.linspace(0,15,num=1000):
-		s = compute_sing(1.,10,0.5,bd,nt)[0]
-		print t,s
+	x = np.concatenate( (x1, x2, xint) )
+	y = np.concatenate( (y1, y2, yint) )
+
+	r = np.sqrt(x**2 + y**2)
+	t = np.arctan(y/x)
+
+	lams = np.arange(0.5, 100, 0.5)
+	S = []
+	for lam in lams:
+		A = evaluate_basis_func(a, lam, r, t, k)
+		A = A.T
+		S.append(find_sing_val(A,2*num_pts))
+
+	with open('shape.dat', 'w+') as f:
+		for n in range(4*num_pts):
+			f.write( str(r[n]*np.cos(t[n])) + ' ' + str(r[n]*np.sin(t[n])) + '\n')
+
+	with open('out.dat', 'w+') as f:
+		for n in range(len(lams)):
+			f.write( str(lams[n]) + ' ' + str(S[n]) + '\n')
+
+	mins = []
+	for i in range(len(lams))[1:-1]:
+		if S[i-1] > S[i] and S[i+1] > S[i]:
+			mins.append(lams[i])
+
+	print mins
+
+	eigs = []
+	for m in range(1,5):
+		for n in range(1,5):
+			eigs.append( np.pi**2*(m**2 + n**2) )
+	print sorted(eigs)
+
+if __name__ == '__main__':
+	compute_square_eigenvalues()
